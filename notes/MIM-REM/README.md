@@ -1,10 +1,12 @@
-### REM: A Scalable Reinforced Multi-Expert Framework for Multiplex Influence Maximization
+## REM: A Scalable Reinforced Multi-Expert Framework for Multiplex Influence Maximization
 
-#### 1. Background
+> URL: https://arxiv.org/pdf/2501.00779
+
+### 1. Background
 
 The Influence Maximization (IM) problem seeks to identify the optimal set of nodes (seed set) in a network to maximize the spread of influence under diffusion models. IM is NP-hard, with traditional greedy algorithms offering near-optimal solutions but suffering from scalability issues.
 
-#### 2. Method
+### 2. Method
 
 The REM (Reinforced Exploration Model) framework addresses these limitations through two key components: 
 
@@ -36,7 +38,7 @@ End-to-End Objective:
 $$\mathcal{L}_{Train} = \mathbb{E}[\mathcal{L}_{ELBO} + \mathcal{L}_{PMoE} + \mathcal{L}_{Explore}]$$
 
 
-#### 3. Results
+### 3. Results
 
 #### Datasets
 - Cora-ML: Citation network with 2,708 nodes, 7,981 edges.

@@ -1,10 +1,10 @@
-# Scalable Quantum-Inspired Optimization through Dynamic Qubit Compression
+## Scalable Quantum-Inspired Optimization through Dynamic Qubit Compression
 
 > URL : https://arxiv.org/abs/2412.18571
 
-## 1. Background
+### 1. Background
 
-### 1.1. Related Work 
+#### 1.1. Related Work 
 - **Ising Models & NP-Hard Problems**  
   - **Ising Hamiltonian**:  
     $$H = -\sum_{i,j} J_{ij} s_i s_j - \sum_i h_i s_i, \quad s_i \in \{-1, +1\}$$
@@ -20,11 +20,11 @@
   - Adiabatic Evolution:  
 
 
-### 1.2. Motivation
+#### 1.2. Motivation
 - Qubit limitation in quantum hardware (D-Wave ≤ 5,640 qubits).  
 - Existing reduction methods not tunable.   
 
-## 2. Method  
+### 2. Method  
 
 ![DIAGRAM](media/model_diagram.svg)
 
@@ -32,7 +32,7 @@ A GNN model is trained to classify edges (i.e not directly trained to compress g
 
 The model is trained on small graphs and inferred on large graphs, and still achieves good results. This is validated by comparing the full graph's solution vs. the compressed graph's solution on D-Wave.
 
-### 2.1. Dataset Generation and GNN Training
+#### 2.1. Dataset Generation and GNN Training
 
 The Ising models are created as a weighted graph $G = (V, E)$. 
 
@@ -77,7 +77,7 @@ $$w_i = \lambda \cdot c_i + (1 - \lambda)$$
 
 $$\mathcal{L} = \sum_{i} w_i \left( -y_i \log(\hat{y}_i) - (1 - y_i) \log(1 - \hat{y}_i) \right)$$
 
-### 2.2. Compression Phase  
+#### 2.2. Compression Phase  
 
 After training, the GNN is used in a separate iterative process to reduce the Ising model.
 
@@ -107,7 +107,7 @@ Compression continues iteratively until the desired reduction is achieved.
   $$\text{Reduction} = 1 - \frac{q_{\text{compressed}}}{q_{\text{original}}}$$
 
 
-## 3. Results & Ablation
+### 3. Results & Ablation
 -
   - 75% reduction still maintains 91% optimality.  
   - Significant qubit savings across all graph types.  
@@ -117,7 +117,7 @@ Compression continues iteratively until the desired reduction is achieved.
     - Hybrid loss achieves best performance compared to BCE/MSE.  
     - 3-layer GNN is optimal for accuracy and generalization.  
 
-## 4. Future Work (& Personal Ideas)
+### 4. Future Work (& Personal Ideas)
 
 - Apply GRANITE to real-world datasets i.e (Multiplex) Influence Maximization
 

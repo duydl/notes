@@ -1,120 +1,111 @@
-# Graph Neural Ising Transformer for Efficient Quantum Optimization
+# Scalable Quantum-Inspired Optimization through Dynamic Qubit Compression
 
-## **1. Background**  
+> URL : https://arxiv.org/abs/2412.18571
 
-### **1.1. Related Work**  
+## 1. Background
+
+### 1.1. Related Work 
 - **Ising Models & NP-Hard Problems**  
   - **Ising Hamiltonian**:  
-    \[
-    H = -\sum_{i,j} J_{ij} s_i s_j - \sum_i h_i s_i, \quad s_i \in \{-1, +1\}
-    \]
-    The energy function defines interactions between spins. The goal is to minimize \( H \), which leads to finding the ground state configuration.
+    $$H = -\sum_{i,j} J_{ij} s_i s_j - \sum_i h_i s_i, \quad s_i \in \{-1, +1\}$$
+
+    The energy function defines interactions between spins. The goal is to minimize $H$, which leads to finding the ground state configuration.
 
   - **QUBO Formulation**:  
-    \[
-    \min_{x} \sum_{i,j} Q_{ij} x_i x_j + \sum_i c_i x_i, \quad x_i \in \{0,1\}
-    \]
-    QUBO is equivalent to Ising models in its ground state, where the optimal solutions correspond to the lowest-energy configurations of the Ising system, with \( s_i = 2x_i - 1 \), mapping combinatorial problems to quantum hardware.
+    $$\min_{x} \sum_{i,j} Q_{ij} x_i x_j + \sum_i c_i x_i, \quad x_i \in \{0,1\}$$
 
+    QUBO is equivalent to Ising models in its ground state, where the optimal solutions correspond to the ground state (lowest-energy) configurations of the Ising system, with $s_i = 2x_i - 1$, mapping combinatorial problems to quantum hardware.
 
 - **Quantum Annealing (QA)**  
   - Adiabatic Evolution:  
 
 
-
-- **Graph Format**  
-  - Edge Feature: Both spin-spin interactions and external fields are treated as edge weights.
-    \[
-    w(i, j) = \begin{cases}
-        J_{ij}, & i \neq j \\
-        h_j, & i = 0
-    \end{cases}
-    \]
-
-
-### **1.2. Motivation**  
+### 1.2. Motivation
 - Qubit limitation in quantum hardware (D-Wave ≤ 5,640 qubits).  
 - Existing reduction methods not tunable.   
 
-## **2. Method**  
+## 2. Method  
 
-<!-- The GNN is not directly trained to compress graphs—it is trained to classify edges. Compression is a separate iterative process that applies the trained GNN model. -->
+![DIAGRAM](media/model_diagram.svg)
 
-### **2.1. Dataset Generation**  
-- Graph Construction:  
-  - The Ising model can be represented as a weighted graph where nodes are spins and edges represent interactions:  
-    \[
-    V = \{0, 1, \dots, n\}, \quad E = \{(i, j) \mid J_{ij} \neq 0\}
-    \]
-- Ground state determination:  
-  - Solve Ising via **Gurobi MIQP solver** (Mixed-Integer Quadratic Programming)
+A GNN model is trained to classify edges (i.e not directly trained to compress graphs). Compression happens in a separate iterative process that applies the trained GNN model.
 
-  - Label edges \((i,j)\):  
-    - **Alignment** (\(s_i = s_j\) in all ground states) → **Label: Merge**
-    - **Anti-alignment** (\(s_i = -s_j\) in all ground states) → **Label: Flip-merge**
-    - **Neutral** (Different states appear across ground states) → **Label: No merge**  
- 
-- **Edge classification is Co-NP-hard**
-### 2.2. GNN Model
-The GNN Model lean to classify edge...
+The model is trained on small graphs and inferred on large graphs, and still achieves good results. This is validated by comparing the full graph's solution vs. the compressed graph's solution on D-Wave.
 
-- GNN Node & Edge Updates: Each node (spin) and each edge updates its feature based on neighboring spins and the connecting edges as follow: 
-  \[
-  h_v^{(\ell)} = \text{MLP}_1 \left(  h_v^{(\ell-1)} \oplus \sum_{u\in \mathcal{N}(v)}  h_{u}^{(\ell-1)} \oplus\sum_{u\in \mathcal{N}(v)} e_{v, u}^{(\ell-1)} \right)
-  \]
+### 2.1. Dataset Generation and GNN Training
 
-  \[
-  e_{uv}^{(\ell)} =  \text{MLP}_2\left(h_u^{(\ell-1)} \oplus h_v^{(\ell-1)} \oplus e_{uv}^{(\ell-1)}\right)
-  \]
+The Ising models are created as a weighted graph $G = (V, E)$. 
 
 
-- Prediction of Merge Candidates: The neural network predicts whether two spins should be merged based on their learned features.  
-  \[
-  z_{uv} = h_u^{(L)} \oplus h_v^{(L)} \oplus e_{uv}^{(L)}
-  \]
+- **Nodes ($V$)** represent spins $s_i$.  
+- **Edges ($E$)** exist if $J_{ij} \neq 0$, representing spin interactions.  
 
-  \[
-  \hat{y}_{uv} = \sigma(\langle w, z_{uv} \rangle)
-  \]
+1. Edge Weights:  
+   - Interaction strength $J_{ij}$ is encoded as edge weight: $w(i, j) = J_{ij}$
+   - External field $h_i$ is encoded as one virtual node $v_0$:  $w(0, i) = h_i$
 
-- Loss Function : The softmax function prioritizes high-confidence predictions, ensuring the most certain merges are performed first.    
-  \[
-  c_i = \frac{\exp\left(|\hat{y}_{i} - 0.5| / T\right)}{\sum_{j} \exp\left(|\hat{y}_{j} - 0.5| / T\right)}
-  \]
+2. Node Features: Each node $i$ is assigned:  
+   - Degree: $\deg(i)$  
+   - Weighted degree: $\sum_{j \in \mathcal{N}(i)} |J_{ij}|$  
+   - Absolute weighted degree: $\sum_{j \in \mathcal{N}(i)} J_{ij}$  
 
-  \[
-  w_i = \lambda \cdot c_i + (1 - \lambda)
-  \]
+3. Labels: Ground states are determined using **Gurobi MIQP solver** (Mixed-Integer Quadratic Programming). Edge labels are assigned based on ground state alignments:
+- **Alignment** ($s_i = s_j$ in all ground states) → **Merge**  
+- **Anti-alignment** ($s_i = -s_j$ in all ground states) → **Flip-Merge**  
+- **Neutral** (State varies across ground states) → **No merge** 
 
+4. Graph Types:  
+   - Instances generated using **Erdős-Rényi (ER)**, **Barabási-Albert (BA)**, and **Watts-Strogatz (WS)** models.  
+   - Sizes range upto 26 nodes for training.  
 
-  \[
-  \mathcal{L} = \sum_{i} w_i \left( -y_i \log(\hat{y}_i) - (1 - y_i) \log(1 - \hat{y}_i) \right)
-  \]
+Edge classification is **Co-NP-hard**, motivating the use of a Graph Neural Network (GNN) for prediction.
 
+The GNN model learns node and edge representations iteratively through message passing. The update rules for nodes and edges at layer $\ell$ are:
+$$h_v^{(\ell)} = \text{MLP}_1 \left( h_v^{(\ell-1)} \oplus \sum_{u\in \mathcal{N}(v)}  h_{u}^{(\ell-1)} \oplus\sum_{u\in \mathcal{N}(v)} e_{v, u}^{(\ell-1)} \right)$$
 
-### 2.3 Compression Phase :
+$$e_{uv}^{(\ell)} =  \text{MLP}_2\left(h_u^{(\ell-1)} \oplus h_v^{(\ell-1)} \oplus e_{uv}^{(\ell-1)}\right)$$
 
-Operation
-  - Merge Operation: When two spins are always aligned, merging them reduces problem size while preserving the original optimization structure.
-    \[
-    w(i, k) = w(i,k) + w(j,k)
-    \]
+For each edge, the model predicts whether edges' alignment i.e should be merged or flip-merged:
+$$z_{uv} = h_u^{(L)} \oplus h_v^{(L)} \oplus e_{uv}^{(L)}$$
 
-  - Flip-Merge Operation: If two spins are always opposite, flipping before merging. 
+$$\hat{y}_{uv} = \sigma(\langle w, z_{uv} \rangle)$$
 
+Confidence-weighted loss function is used:
+$$c_i = \frac{\exp\left(|\hat{y}_{i} - 0.5| / T\right)}{\sum_{j} \exp\left(|\hat{y}_{j} - 0.5| / T\right)}$$
 
-Evaluation Metrics
+$$w_i = \lambda \cdot c_i + (1 - \lambda)$$
 
+$$\mathcal{L} = \sum_{i} w_i \left( -y_i \log(\hat{y}_i) - (1 - y_i) \log(1 - \hat{y}_i) \right)$$
 
-  - **Optimality**: Measures how close the reduced problem's solution is to the original optimal solution
-    \[
-    \text{Optimality} = 1 - \frac{|E_{\text{best}} - E_{\text{min}}|}{|E_{\text{min}}|}
-    \] 
+### 2.2. Compression Phase  
 
-  - **Qubit Reduction**: Measures how many qubits are saved after compression, needed for quantum annealer feasibility.
-    \[
-    \text{Reduction} = 1 - \frac{q_{\text{compressed}}}{q_{\text{original}}}
-    \]
+After training, the GNN is used in a separate iterative process to reduce the Ising model.
+
+(Sizes of testing dataset includes larger graphs (e.g., up to 400 nodes). D-Wave QA is used to find the ground-state.) 
+
+![ALGO](media/algo.png)
+
+**The compression algorithm applies the following operations:**
+- **Merge Operation** (for aligned spins):  
+  $$w(i, k) = w(i, k) + w(j, k)$$
+
+  This reduces problem size while preserving optimization structure.
+
+- **Flip-Merge Operation** (for anti-aligned spins):  
+  The sign of spin interactions is flipped before merging.
+
+Compression continues iteratively until the desired reduction is achieved.
+
+**Metrics for Evaluation are as follow:**
+
+  - **Optimality**: Measures solution quality preservation after compression.
+  $$\text{Optimality} = 1 - \frac{|E_{\text{best}} - E_{\text{min}}|}{|E_{\text{min}}|}$$
+
+  $E_{\text{best}}$ is the best energy found after compression, and $E_{\text{min}}$ is the optimal energy from the full model.
+
+  - **Qubit Reduction**: Measures the percentage of qubits saved.
+  $$\text{Reduction} = 1 - \frac{q_{\text{compressed}}}{q_{\text{original}}}$$
+
 
 ## 3. Results & Ablation
 -
@@ -126,10 +117,8 @@ Evaluation Metrics
     - Hybrid loss achieves best performance compared to BCE/MSE.  
     - 3-layer GNN is optimal for accuracy and generalization.  
 
-## 4. Conclusion & Future Work
+## 4. Future Work (& Personal Ideas)
 
-- Apply GRANITE to real-world datasets, extend to noisy quantum hardware.
-
-## 5. Personal Ideas
+- Apply GRANITE to real-world datasets i.e (Multiplex) Influence Maximization
 
 - New optimization i.e Reinforcement Learning
